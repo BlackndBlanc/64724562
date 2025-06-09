@@ -2,7 +2,7 @@ name: Update
 
 on:
   schedule:
-    - cron: "0/15 * * * *"
+    - cron: "0/15 * * * *"  # كل 15 دقيقة
   workflow_dispatch:
 
 jobs:
@@ -14,16 +14,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+
       - name: Install node v16
         uses: actions/setup-node@v2
         with:
           node-version: '16'
+
       - name: Install dependencies
         run: npm install
+
+      - name: Make update-version executable
+        run: chmod +x update-version
+
       - name: Run Updater
         run: ./update-version
+
       - name: Store WA Version
         run: echo WA_VERSION=`cat ./.version` >> $GITHUB_ENV
+
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v3
         with:
