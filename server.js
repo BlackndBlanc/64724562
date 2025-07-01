@@ -71,12 +71,12 @@ client.on('message', async (msg) => {
 app.get('/qr', (_req, res) => {
   if (!latestQR)
     return res.send('<h3>🔄 QR Code is not ready yet…</h3>');
-  res.send(
+  res.send(`
     <html><body style="text-align:center;margin-top:40px">
       <h2>📲 Scan this QR Code</h2>
       <img src="${latestQR}" width="300"/>
     </body></html>
-  );
+  `);
 });
 
 /* ─────────────────────────── Text Message ─────────────────────────────── */
@@ -85,7 +85,7 @@ app.post('/api/send-text', async (req, res) => {
   if (!phone || !message) return res.status(400).send('phone / message?');
 
   try {
-    await client.sendMessage(${phone}@c.us, message);
+    await client.sendMessage(`${phone}@c.us`, message);
     res.send('Text sent');
   } catch (e) {
     console.error(e); res.status(500).send('Failed');
@@ -101,7 +101,7 @@ app.post('/api/send-image-url', async (req, res) => {
     const resp   = await fetch(imageUrl);
     const buffer = await resp.buffer();
     const media  = new MessageMedia('image/jpeg', buffer.toString('base64'), 'img.jpg');
-    await client.sendMessage(${phone}@c.us, media, { caption });
+    await client.sendMessage(`${phone}@c.us`, media, { caption });
     res.send('Image sent');
   } catch (e) {
     console.error(e); res.status(500).send('Failed');
@@ -114,7 +114,7 @@ app.post('/api/send-list', async (req, res) => {
   if (!phone || !Array.isArray(sections)) return res.status(400).send('phone / sections?');
 
   try {
-    await client.sendMessage(${phone}@c.us, {
+    await client.sendMessage(`${phone}@c.us`, {
       buttonText,
       description,
       sections,
@@ -137,7 +137,7 @@ app.post('/api/send-reply-buttons', async (req, res) => {
   }));
 
   try {
-    await client.sendMessage(${phone}@c.us, { text, templateButtons });
+    await client.sendMessage(`${phone}@c.us`, { text, templateButtons });
     res.send('Reply buttons sent');
   } catch (e) {
     console.error(e); res.status(500).send('Failed');
@@ -151,7 +151,7 @@ app.post('/api/send-buttons', async (req, res) => {
 
   try {
     const oldBtns = new Buttons(message, buttons, title, footer);
-    await client.sendMessage(${phone}@c.us, oldBtns);
+    await client.sendMessage(`${phone}@c.us`, oldBtns);
     res.send('Legacy buttons sent');
   } catch (e) {
     console.error(e); res.status(500).send('Failed');
@@ -169,7 +169,7 @@ app.post('/api/send-media-url', async (req, res) => {
     const response = await fetch(mediaUrl);
     const buffer = await response.buffer();
     const media = new MessageMedia(mimeType, buffer.toString('base64'), fileName);
-    await client.sendMessage(${phone}@c.us, media, { caption });
+    await client.sendMessage(`${phone}@c.us`, media, { caption });
     res.status(200).send('Media sent');
   } catch (err) {
     console.error('❌ Error sending media:', err);
@@ -183,4 +183,4 @@ app.get('/status', (_req, res) =>
 );
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(🚀  http://localhost:${PORT}));
+app.listen(PORT, () => console.log(`🚀  http://localhost:${PORT}`));
