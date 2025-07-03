@@ -12,6 +12,9 @@ app.use(express.json());
 
 /* ───── إعداد WhatsApp ───── */
 let latestQR = null;
+let lastActivity = Date.now();
+let idleTimer = null;
+const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes idle timeout
 
 const client = new Client({
   authStrategy: new LocalAuth(),
@@ -37,13 +40,21 @@ client.on('qr', qr => {
   });
 });
 
+client.on('ready', () => {
+  console.log('✅ WhatsApp Client ready');
+  // Start idle timer after the client is ready
+  startIdleTimer();
 client.on('ready', () => console.log('✅ WhatsApp Client ready'));
+client.initialize();
 
 /* ───── Webhook لرسائل الواتساب ───── */
 const TEST_WEBHOOK_URL = process.env.TEST_WEBHOOK_URL;
 const PROD_WEBHOOK_URL = process.env.PROD_WEBHOOK_URL;
 
 client.on('message', async (msg) => {
+  // Update activity and reset timer on new message
+  updateActivity();
+
   // تجاهل الرسائل الغير مهمة
   if (
     msg.from === 'status@broadcast' ||        // الحالة
@@ -88,6 +99,9 @@ app.get('/qr', (_req, res) => {
 
 /* ───── Text Message ───── */
 app.post('/api/send-text', async (req, res) => {
+  // Update activity and reset timer on outgoing message
+  updateActivity();
+
   const { phone, message } = req.body;
   if (!phone || !message) return res.status(400).send('phone / message?');
 
@@ -102,6 +116,9 @@ app.post('/api/send-text', async (req, res) => {
 
 /* ───── Image from URL ───── */
 app.post('/api/send-image-url', async (req, res) => {
+  // Update activity and reset timer on outgoing message
+  updateActivity();
+
   const { phone, imageUrl, caption = '' } = req.body;
   if (!phone || !imageUrl) return res.status(400).send('phone / imageUrl?');
 
@@ -119,6 +136,9 @@ app.post('/api/send-image-url', async (req, res) => {
 
 /* ───── List Message ───── */
 app.post('/api/send-list', async (req, res) => {
+  // Update activity and reset timer on outgoing message
+  updateActivity();
+
   const { phone, sections, description = 'اختر من القائمة', buttonText = 'اختر' } = req.body;
   if (!phone || !Array.isArray(sections)) return res.status(400).send('phone / sections?');
 
@@ -138,6 +158,9 @@ app.post('/api/send-list', async (req, res) => {
 
 /* ───── Reply Buttons ───── */
 app.post('/api/send-reply-buttons', async (req, res) => {
+  // Update activity and reset timer on outgoing message
+  updateActivity();
+
   const { phone, text, buttons } = req.body;
   if (!phone || !text || !Array.isArray(buttons)) return res.status(400).send('payload?');
 
@@ -157,6 +180,9 @@ app.post('/api/send-reply-buttons', async (req, res) => {
 
 /* ───── Old-style Buttons ───── */
 app.post('/api/send-buttons', async (req, res) => {
+  // Update activity and reset timer on outgoing message
+  updateActivity();
+
   const { phone, message, buttons, title = '', footer = '' } = req.body;
   if (!phone || !message || !Array.isArray(buttons)) return res.status(400).send('bad payload');
 
@@ -172,6 +198,9 @@ app.post('/api/send-buttons', async (req, res) => {
 
 /* ───── Media (PDF / Audio / Image) ───── */
 app.post('/api/send-media-url', async (req, res) => {
+  // Update activity and reset timer on outgoing message
+  updateActivity();
+
   const { phone, mediaUrl, mimeType, fileName, caption } = req.body;
   if (!phone || !mediaUrl || !mimeType || !fileName) {
     return res.status(400).send('Missing phone, mediaUrl, mimeType, or fileName');
@@ -196,3 +225,56 @@ app.get('/status', (_req, res) =>
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀  http://localhost:${PORT}`));
+
+// Webhook endpoint to trigger WhatsApp client initialization if not ready
+const RAILWAY_WEBHOOK_URL = process.env.WEBHOOK_URL || '/webhook'; // Default to /webhook if not set
+app.post(RAILWAY_WEBHOOK_URL, async (req, res) => {
+  console.log('Webhook received.');
+  // Update activity and reset timer on incoming webhook
+  updateActivity();
+
+  if (!client.info) {
+    console.log('WhatsApp client not ready, initializing...');
+    try {
+      await client.initialize();
+      console.log('WhatsApp client initialized by webhook.');
+      res.status(200).send('WhatsApp client initialization triggered by webhook.');
+    } catch (error) {
+      console.error('Error initializing WhatsApp client from webhook:', error);
+      res.status(500).send('Failed to initialize WhatsApp client from webhook.');
+    }
+  } else {
+    console.log('WhatsApp client already ready.');
+    res.status(200).send('WhatsApp client already ready.');
+  }
+});
+
+
+// Function to update activity timestamp and reset idle timer
+function updateActivity() {
+  lastActivity = Date.now();
+  resetIdleTimer();
+}
+
+// Function to start the idle timer
+function startIdleTimer() {
+  idleTimer = setTimeout(goToMinimalState, IDLE_TIMEOUT);
+}
+
+// Function to reset the idle timer
+function resetIdleTimer() {
+  clearTimeout(idleTimer);
+  startIdleTimer();
+}
+
+// Function to transition to minimal state (destroy client)
+function goToMinimalState() {
+  console.log('Idle timeout reached, transitioning to minimal state...');
+  if (client && client.info) {
+    client.destroy().then(() => {
+      console.log('WhatsApp client destroyed.');
+    }).catch(error => {
+      console.error('Error destroying WhatsApp client:', error);
+    });
+  }
+}
