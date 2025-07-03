@@ -12,7 +12,6 @@ app.use(express.json());
 
 /* ───── إعداد WhatsApp ───── */
 let latestQR = null;
-let lastActivity = Date.now();
 let idleTimer = null;
 const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes idle timeout
 
