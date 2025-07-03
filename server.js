@@ -10,7 +10,7 @@ require('dotenv').config();
 const app = express();
 app.use(express.json());
 
-/* ─────────── إعداد WhatsApp ─────────── */
+/* ───── إعداد WhatsApp ───── */
 let latestQR = null;
 
 const client = new Client({
@@ -38,15 +38,18 @@ client.on('qr', qr => {
 });
 
 client.on('ready', () => console.log('✅ WhatsApp Client ready'));
-client.initialize();
 
-/* ─────────── Webhook للرسائل ─────────── */
+/* ───── Webhook لرسائل الواتساب ───── */
 const TEST_WEBHOOK_URL = process.env.TEST_WEBHOOK_URL;
 const PROD_WEBHOOK_URL = process.env.PROD_WEBHOOK_URL;
 
 client.on('message', async (msg) => {
-  // 🛑 استبعاد رسائل status و المجموعات
-  if (msg.from === 'status@broadcast' || msg.from.endsWith('@g.us')) {
+  // تجاهل الرسائل الغير مهمة
+  if (
+    msg.from === 'status@broadcast' ||        // الحالة
+    msg.from.endsWith('@g.us') ||             // المجموعات
+    !msg.body || msg.body.trim() === ''       // الرسائل الفارغة
+  ) {
     return;
   }
 
@@ -72,10 +75,9 @@ client.on('message', async (msg) => {
   }
 });
 
-/* ─────────── QR Code View ─────────── */
+/* ───── QR Display ───── */
 app.get('/qr', (_req, res) => {
-  if (!latestQR)
-    return res.send('<h3>🔄 QR Code is not ready yet…</h3>');
+  if (!latestQR) return res.send('<h3>🔄 QR Code is not ready yet…</h3>');
   res.send(`
     <html><body style="text-align:center;margin-top:40px">
       <h2>📲 Scan this QR Code</h2>
@@ -84,7 +86,7 @@ app.get('/qr', (_req, res) => {
   `);
 });
 
-/* ─────────── إرسال رسالة نصية ─────────── */
+/* ───── Text Message ───── */
 app.post('/api/send-text', async (req, res) => {
   const { phone, message } = req.body;
   if (!phone || !message) return res.status(400).send('phone / message?');
@@ -93,11 +95,12 @@ app.post('/api/send-text', async (req, res) => {
     await client.sendMessage(`${phone}@c.us`, message);
     res.send('Text sent');
   } catch (e) {
-    console.error(e); res.status(500).send('Failed');
+    console.error(e);
+    res.status(500).send('Failed');
   }
 });
 
-/* ─────────── إرسال صورة من URL ─────────── */
+/* ───── Image from URL ───── */
 app.post('/api/send-image-url', async (req, res) => {
   const { phone, imageUrl, caption = '' } = req.body;
   if (!phone || !imageUrl) return res.status(400).send('phone / imageUrl?');
@@ -109,11 +112,12 @@ app.post('/api/send-image-url', async (req, res) => {
     await client.sendMessage(`${phone}@c.us`, media, { caption });
     res.send('Image sent');
   } catch (e) {
-    console.error(e); res.status(500).send('Failed');
+    console.error(e);
+    res.status(500).send('Failed');
   }
 });
 
-/* ─────────── إرسال قائمة ─────────── */
+/* ───── List Message ───── */
 app.post('/api/send-list', async (req, res) => {
   const { phone, sections, description = 'اختر من القائمة', buttonText = 'اختر' } = req.body;
   if (!phone || !Array.isArray(sections)) return res.status(400).send('phone / sections?');
@@ -127,11 +131,12 @@ app.post('/api/send-list', async (req, res) => {
     });
     res.send('List sent');
   } catch (e) {
-    console.error(e); res.status(500).send('Failed');
+    console.error(e);
+    res.status(500).send('Failed');
   }
 });
 
-/* ─────────── أزرار ردود جديدة ─────────── */
+/* ───── Reply Buttons ───── */
 app.post('/api/send-reply-buttons', async (req, res) => {
   const { phone, text, buttons } = req.body;
   if (!phone || !text || !Array.isArray(buttons)) return res.status(400).send('payload?');
@@ -145,11 +150,12 @@ app.post('/api/send-reply-buttons', async (req, res) => {
     await client.sendMessage(`${phone}@c.us`, { text, templateButtons });
     res.send('Reply buttons sent');
   } catch (e) {
-    console.error(e); res.status(500).send('Failed');
+    console.error(e);
+    res.status(500).send('Failed');
   }
 });
 
-/* ─────────── أزرار قديمة ─────────── */
+/* ───── Old-style Buttons ───── */
 app.post('/api/send-buttons', async (req, res) => {
   const { phone, message, buttons, title = '', footer = '' } = req.body;
   if (!phone || !message || !Array.isArray(buttons)) return res.status(400).send('bad payload');
@@ -159,11 +165,12 @@ app.post('/api/send-buttons', async (req, res) => {
     await client.sendMessage(`${phone}@c.us`, oldBtns);
     res.send('Legacy buttons sent');
   } catch (e) {
-    console.error(e); res.status(500).send('Failed');
+    console.error(e);
+    res.status(500).send('Failed');
   }
 });
 
-/* ─────────── إرسال ملف وسائط ─────────── */
+/* ───── Media (PDF / Audio / Image) ───── */
 app.post('/api/send-media-url', async (req, res) => {
   const { phone, mediaUrl, mimeType, fileName, caption } = req.body;
   if (!phone || !mediaUrl || !mimeType || !fileName) {
@@ -182,7 +189,7 @@ app.post('/api/send-media-url', async (req, res) => {
   }
 });
 
-/* ─────────── Health Check ─────────── */
+/* ───── Health Check ───── */
 app.get('/status', (_req, res) =>
   res.status(client.info ? 200 : 503).send(client.info ? 'Ready' : 'Not ready')
 );
