@@ -42,10 +42,11 @@ client.on('qr', qr => {
 
 client.on('ready', () => {
   console.log('✅ WhatsApp Client ready');
-  // Start idle timer after the client is ready
   startIdleTimer();
-client.on('ready', () => console.log('✅ WhatsApp Client ready'));
+});
+
 client.initialize();
+
 
 /* ───── Webhook لرسائل الواتساب ───── */
 const TEST_WEBHOOK_URL = process.env.TEST_WEBHOOK_URL;
